@@ -89,6 +89,8 @@ input[type=number]{font-family:var(--f-mono);width:6.5em;text-align:right}
 .triphead .del{margin-left:auto;font:inherit;font-size:.78rem;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:7px;padding:3px 9px;cursor:pointer}
 .triphead .del.arm{border-color:var(--danger);color:var(--danger)}
 .muted{color:var(--muted);font-size:.85rem}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.danger.arm{background:var(--danger);color:var(--surface)}
 .other{display:flex;flex-direction:column;gap:10px}
 .orow{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border-radius:10px;border:1px dashed var(--line)}
 .orow .full{grid-column:1/-1}
@@ -149,6 +151,15 @@ body{margin:0;-webkit-text-size-adjust:100%}
     <div class="card">
       <div class="row"><label class="f">表示する月<input type="month" id="histMonth"></label></div>
       <div id="histList"></div>
+    </div>
+    <div class="card">
+      <h2>年ごとにまとめて削除</h2>
+      <p class="muted" style="margin:0">確定申告が終わった年の記録を一度に消せます。消した記録は元に戻せないので、先に「運賃表」タブの「バックアップを書き出す」をしておくと安心です。</p>
+      <div class="row">
+        <label class="f">削除する年<select id="purgeYear"></select></label>
+      </div>
+      <div id="purgeInfo" class="muted"></div>
+      <button class="btn sub danger" id="purgeBtn" disabled>この年の記録を削除</button>
     </div>
   </section>
 
@@ -422,7 +433,21 @@ function renderSum(){
   const m = today().slice(0,7);
   $('sumMonth').textContent = yen(trips.filter(t=>t.date&&t.date.startsWith(m)).reduce((s,t)=>s+tripTotal(t),0));
 }
-function renderAll(){ renderBackup(); rebuildDraft(); renderEntry(); renderHistory(); renderCsv(); renderFares(); renderBanner(); renderSum(); }
+let purgeArmed = false;
+function renderPurge(){
+  const sel = $('purgeYear'); const cur = sel.value;
+  const years = {};
+  trips.forEach(t=>{ if(!t.date) return; const y=t.date.slice(0,4); (years[y]=years[y]||{n:0,sum:0}); years[y].n++; years[y].sum+=tripTotal(t); });
+  const ys = Object.keys(years).sort();
+  sel.innerHTML = ys.length ? ys.map(y=>'<option value="'+y+'">'+y+'年（'+years[y].n+'件）</option>').join('') : '<option value="">記録がありません</option>';
+  if(ys.includes(cur)) sel.value = cur;
+  const y = sel.value;
+  purgeArmed = false; const b = $('purgeBtn'); b.classList.remove('arm');
+  b.disabled = !y; b.textContent = y ? y+'年の記録を削除' : 'この年の記録を削除';
+  let last=''; try{ last = localStorage.getItem(LS+'-lastbackup')||''; }catch(e){}
+  $('purgeInfo').textContent = y ? y+'年：'+years[y].n+'件・合計'+yen(years[y].sum)+'　／　前回のバックアップ：'+(last?last.replace(/-/g,'/'):'なし') : '';
+}
+function renderAll(){ renderPurge(); renderBackup(); rebuildDraft(); renderEntry(); renderHistory(); renderCsv(); renderFares(); renderBanner(); renderSum(); }
 
 function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
 function setRange(which){
@@ -496,6 +521,17 @@ $('histList').addEventListener('click', async e=>{
   try{ await removeTrip(b.dataset.del); toast('削除しました'); }catch(err){ toast('削除できませんでした'); }
 });
 $('histMonth').addEventListener('change', renderHistory);
+$('purgeYear').addEventListener('change', renderPurge);
+$('purgeBtn').addEventListener('click', ()=>{
+  const y = $('purgeYear').value; if(!y) return; const b = $('purgeBtn');
+  if(!purgeArmed){
+    purgeArmed = true; b.classList.add('arm'); b.textContent = 'もう一度押すと'+y+'年の記録をすべて削除（元に戻せません）';
+    setTimeout(()=>{ if(purgeArmed){ renderPurge(); } }, 6000); return;
+  }
+  const before = trips.length;
+  trips = trips.filter(t=>!(t.date && t.date.startsWith(y+'-')));
+  lsSave(); renderAll(); toast(y+'年の記録を'+(before-trips.length)+'件削除しました');
+});
 $('from').addEventListener('change', renderCsv); $('to').addEventListener('change', renderCsv);
 document.querySelectorAll('[data-range]').forEach(b=>b.addEventListener('click', ()=>setRange(b.dataset.range)));
 $('copy').addEventListener('click', ()=>{
