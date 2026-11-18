@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="交通費">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#eef0f3">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>交通費ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column like a commuter pass case; tabs on top, ticket-style rows with mono fares */
+:root{
+  --bg:#eef0f3; --surface:#ffffff; --ink:#18212e; --muted:#5d6878; --line:#d5dae2;
+  --accent:#d9650b; --accent-ink:#ffffff; --accent-soft:#fbe9da;
+  --navy:#22324a; --ok:#1f7a4d; --warn:#a4560a; --warn-soft:#fff3e2; --danger:#b42318;
+  --f-display:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161e; --surface:#1a212c; --ink:#e7ebf1; --muted:#9aa5b5; --line:#2e3846;
+  --accent:#f08a35; --accent-ink:#1a1206; --accent-soft:#3a2614;
+  --navy:#9fb4d4; --ok:#5cc58f; --warn:#f0a85a; --warn-soft:#33240f; --danger:#f2766b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161e; --surface:#1a212c; --ink:#e7ebf1; --muted:#9aa5b5; --line:#2e3846;
+  --accent:#f08a35; --accent-ink:#1a1206; --accent-soft:#3a2614;
+  --navy:#9fb4d4; --ok:#5cc58f; --warn:#f0a85a; --warn-soft:#33240f; --danger:#f2766b; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 48px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:900;font-size:1.45rem;margin:0;letter-spacing:.02em}
+.sum{text-align:right}
+.sum small{display:block;color:var(--muted);font-size:.75rem;letter-spacing:.06em}
+.sum b{font-family:var(--f-mono);font-size:1.35rem;font-variant-numeric:tabular-nums}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.tabs button{font:inherit;font-weight:700;font-size:.85rem;border:0;background:transparent;color:var(--muted);padding:9px 2px;border-radius:9px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--navy);color:var(--surface)}
+.panel{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:12px}
+.card h2{font-family:var(--f-display);font-size:1rem;margin:0;display:flex;align-items:center;gap:8px}
+.dirtag{font-size:.72rem;font-weight:700;letter-spacing:.08em;padding:2px 8px;border-radius:99px;background:var(--navy);color:var(--surface)}
+.dirtag.ret{background:var(--accent);color:var(--accent-ink)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--muted);font-weight:500}
+input[type=date],input[type=month],input[type=number],input[type=text]{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+input[type=number]{font-family:var(--f-mono);width:6.5em;text-align:right}
+.daytype{font-size:.8rem;font-weight:700;padding:4px 10px;border-radius:99px;border:1px solid var(--line)}
+.daytype.hd{background:var(--accent-soft);color:var(--warn);border-color:transparent}
+.routes{display:flex;flex-direction:column;gap:6px}
+.route{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;text-align:left;font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid transparent;border-radius:10px;padding:9px 12px;cursor:pointer}
+.route .nm{font-weight:700;min-width:0}
+.route .via{grid-column:1;font-size:.76rem;color:var(--muted)}
+.route .yen{grid-row:1/3;grid-column:2;font-family:var(--f-mono);font-variant-numeric:tabular-nums;color:var(--muted)}
+.route[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.route[aria-pressed="true"] .yen{color:var(--ink)}
+.route.none{grid-template-columns:1fr;color:var(--muted);font-size:.85rem}
+.exp{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px dashed var(--line);cursor:pointer;font-weight:500}
+.exp input{width:20px;height:20px;accent-color:var(--accent)}
+.exp .yen{margin-left:auto;font-family:var(--f-mono)}
+.warn{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:9px 12px;font-size:.85rem;font-weight:500}
+.ticket{border-top:1px dashed var(--line);padding-top:10px;display:flex;flex-direction:column;gap:6px}
+.trow{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.trow .s{font-weight:500;min-width:0}
+.trow .c{font-size:.74rem;color:var(--muted)}
+.trow .c .k{display:inline-block;margin-left:6px;padding:0 6px;border-radius:4px;background:var(--accent-soft);color:var(--warn);font-weight:700}
+.trow input{grid-row:1/3;grid-column:2}
+.trow .amt{grid-row:1/3;grid-column:2;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.total{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;border-top:2px solid var(--ink);padding-top:8px}
+.total b{font-family:var(--f-mono);font-size:1.25rem;font-variant-numeric:tabular-nums}
+.btn{font:inherit;font-weight:700;border:0;border-radius:11px;padding:13px 16px;cursor:pointer;background:var(--accent);color:var(--accent-ink);font-size:1rem}
+.btn.sub{background:transparent;color:var(--ink);border:1px solid var(--line);font-size:.9rem;padding:10px 14px}
+.btn:disabled{opacity:.4;cursor:default}
+.btn:focus-visible,.route:focus-visible,.tabs button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 18px;border-radius:99px;font-weight:700;font-size:.9rem;z-index:20}
+.day{display:flex;flex-direction:column;gap:6px}
+.dayhead{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;border-bottom:1px solid var(--line);padding-bottom:4px}
+.dayhead span{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.trip{display:flex;flex-direction:column;gap:4px;padding:6px 0}
+.triphead{display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:700}
+.triphead .del{margin-left:auto;font:inherit;font-size:.78rem;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:7px;padding:3px 9px;cursor:pointer}
+.triphead .del.arm{border-color:var(--danger);color:var(--danger)}
+.muted{color:var(--muted);font-size:.85rem}
+.other{display:flex;flex-direction:column;gap:10px}
+.orow{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:10px;border-radius:10px;border:1px dashed var(--line)}
+.orow .full{grid-column:1/-1}
+.orow input[type=text],.orow input[type=number],.orow select{width:100%;min-width:0}
+.orow input[type=number]{text-align:right}
+select{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+.orm{grid-column:1/-1;justify-self:end;font:inherit;font-size:.78rem;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:7px;padding:3px 9px;cursor:pointer}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--bg);border-radius:10px;padding:8px 10px}
+.stat small{display:block;color:var(--muted);font-size:.72rem}
+.stat b{font-family:var(--f-mono);font-variant-numeric:tabular-nums;font-size:1.05rem}
+pre.csv{margin:0;background:var(--bg);border-radius:10px;padding:10px;font-family:var(--f-mono);font-size:.74rem;overflow-x:auto;max-height:240px;white-space:pre}
+.fares{display:flex;flex-direction:column;gap:8px}
+.fare{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.fare .c{font-size:.74rem;color:var(--muted)}
+.fare input{grid-row:1/3;grid-column:2}
+.status{font-size:.78rem;color:var(--muted)}
+.status.ok{color:var(--ok)}
+@media (prefers-reduced-motion:no-preference){.route,.tabs button{transition:background .15s,border-color .15s}}
+html{color-scheme:light}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>交通費ノート</h1>
+    <div class="sum"><small id="sumLabel">今月の合計</small><b id="sumMonth">¥0</b></div>
+  </header>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="entry" aria-selected="true">記録</button>
+    <button role="tab" data-tab="history" aria-selected="false">履歴</button>
+    <button role="tab" data-tab="csv" aria-selected="false">CSV</button>
+    <button role="tab" data-tab="fares" aria-selected="false">運賃表</button>
+  </nav>
+  <div id="banner"></div>
+
+  <section class="panel" id="p-entry">
+    <div class="card">
+      <div class="row">
+        <label class="f">乗車日<input type="date" id="date"></label>
+        <span class="daytype" id="daytype">平日</span>
+      </div>
+      <div id="dupWarn"></div>
+    </div>
+    <div class="card" id="c-out"></div>
+    <div class="card" id="c-ret"></div>
+    <div class="card">
+      <div class="ticket" id="preview"></div>
+      <button class="btn" id="save" disabled>この内容で記録</button>
+    </div>
+  </section>
+
+  <section class="panel" id="p-history" hidden>
+    <div class="card">
+      <div class="row"><label class="f">表示する月<input type="month" id="histMonth"></label></div>
+      <div id="histList"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="p-csv" hidden>
+    <div class="card">
+      <h2>期間を選んで書き出し</h2>
+      <div class="row">
+        <label class="f">開始<input type="date" id="from"></label>
+        <label class="f">終了<input type="date" id="to"></label>
+      </div>
+      <div class="row">
+        <button class="btn sub" data-range="this">今月</button>
+        <button class="btn sub" data-range="last">先月</button>
+      </div>
+      <div class="stats" id="csvStats"></div>
+      <pre class="csv" id="csvPre"></pre>
+      <div class="row">
+        <button class="btn" id="dl">CSVを保存</button>
+        <button class="btn sub" id="copy">テキストをコピー</button>
+      </div>
+      <p class="muted" style="margin:0">列は「日付・区間・鉄道会社・金額・種別・備考」。特急料金・グリーン料金は運賃とは別の行になります。「CSVを保存」を押すと共有メニューが出るので、「"ファイル"に保存」やNumbersを選んでください。</p>
+    </div>
+  </section>
+
+  <section class="panel" id="p-fares" hidden>
+    <div class="card">
+      <h2>運賃表（IC運賃）</h2>
+      <p class="muted" style="margin:0">記録時はこの金額が入ります。改定があったらここを直してください。過去の記録の金額は変わりません。</p>
+      <div class="fares" id="fareList"></div>
+      <button class="btn" id="saveFares">運賃表を保存</button>
+      <div class="status" id="storeStatus"></div>
+    </div>
+    <div class="card">
+      <h2>バックアップ</h2>
+      <p class="muted" style="margin:0">記録はこのiPhoneの中にだけあります。月に一度くらい書き出して、iCloud Driveなどに保存しておくと安心です。機種変更のときも、このファイルを読み込めば記録を引き継げます。</p>
+      <div class="status" id="backupInfo"></div>
+      <div class="row">
+        <button class="btn" id="backupOut">バックアップを書き出す</button>
+        <label class="btn sub" for="backupIn" style="display:inline-block">バックアップを読み込む</label>
+        <input type="file" id="backupIn" accept=".json,application/json" hidden>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+const FARE_DEFS = [
+  {k:'K_KH_SHINSEN', s:'京王八王子〜神泉（明大前乗換）', c:'京王電鉄', t:'運賃', v:409},
+  {k:'K_KH_SHIBUYA', s:'京王八王子〜渋谷（明大前乗換）', c:'京王電鉄', t:'運賃', v:409},
+  {k:'K_SJ_KH',      s:'新宿〜京王八王子', c:'京王電鉄', t:'運賃', v:409},
+  {k:'J_HJ_SJ',      s:'八王子〜新宿', c:'東日本旅客鉄道', t:'運賃', v:616},
+  {k:'J_HJ_SHIBUYA', s:'八王子〜渋谷（新宿経由）', c:'東日本旅客鉄道', t:'運賃', v:704},
+  {k:'J_HJ_HARA',    s:'八王子〜原宿（新宿経由）', c:'東日本旅客鉄道', t:'運賃', v:616},
+  {k:'J_HARA_SJ',    s:'原宿〜新宿', c:'東日本旅客鉄道', t:'運賃', v:155},
+  {k:'O_SJ_YYH',     s:'新宿〜代々木八幡', c:'小田急電鉄', t:'運賃', v:157},
+  {k:'X_LINER_WD',   s:'京王ライナー（平日）', c:'京王電鉄', t:'特急料金', v:500},
+  {k:'X_LINER_HD',   s:'京王ライナー（土休日）', c:'京王電鉄', t:'特急料金', v:400},
+  {k:'X_JR_EXP',     s:'中央線特急 八王子〜新宿', c:'東日本旅客鉄道', t:'特急料金', v:760},
+  {k:'X_JR_GREEN',   s:'グリーン車 八王子〜新宿', c:'東日本旅客鉄道', t:'グリーン料金', v:750},
+];
+const FARE_BY = Object.fromEntries(FARE_DEFS.map(f=>[f.k,f]));
+// extra: liner = 京王ライナー, jr = 中央線特急
+const ROUTES = [
+  {id:'O1',dir:'out',name:'京王八王子 → 神泉',via:'京王線・明大前で井の頭線',legs:[['K_KH_SHINSEN','京王八王子〜神泉']],x:{kind:'liner',s:'京王八王子〜明大前'}},
+  {id:'O2',dir:'out',name:'京王八王子 → 渋谷',via:'京王線・明大前で井の頭線',legs:[['K_KH_SHIBUYA','京王八王子〜渋谷']],x:{kind:'liner',s:'京王八王子〜明大前'}},
+  {id:'O3',dir:'out',name:'八王子 → 渋谷',via:'JR中央線・新宿で山手線',legs:[['J_HJ_SHIBUYA','八王子〜渋谷']],x:{kind:'jr',s:'八王子〜新宿'}},
+  {id:'O4',dir:'out',name:'八王子 → 原宿',via:'JR中央線・新宿で山手線',legs:[['J_HJ_HARA','八王子〜原宿']],x:{kind:'jr',s:'八王子〜新宿'}},
+  {id:'O5',dir:'out',name:'八王子 → 代々木八幡',via:'JR中央線・新宿で小田急線',legs:[['J_HJ_SJ','八王子〜新宿'],['O_SJ_YYH','新宿〜代々木八幡']],x:{kind:'jr',s:'八王子〜新宿'}},
+  {id:'R1',dir:'ret',name:'神泉 → 京王八王子',via:'井の頭線・明大前で京王線',legs:[['K_KH_SHINSEN','神泉〜京王八王子']],x:{kind:'liner',s:'明大前〜京王八王子'}},
+  {id:'R2',dir:'ret',name:'渋谷 → 京王八王子',via:'井の頭線・明大前で京王線',legs:[['K_KH_SHIBUYA','渋谷〜京王八王子']],x:{kind:'liner',s:'明大前〜京王八王子'}},
+  {id:'R3',dir:'ret',name:'原宿 → 八王子',via:'山手線・新宿でJR中央線',legs:[['J_HJ_HARA','原宿〜八王子']],x:{kind:'jr',s:'新宿〜八王子'}},
+  {id:'R4',dir:'ret',name:'原宿 → 京王八王子',via:'山手線・新宿で京王線',legs:[['J_HARA_SJ','原宿〜新宿'],['K_SJ_KH','新宿〜京王八王子']],x:{kind:'liner',s:'新宿〜京王八王子'}},
+  {id:'R5',dir:'ret',name:'代々木八幡 → 八王子',via:'小田急線・新宿でJR中央線',legs:[['O_SJ_YYH','代々木八幡〜新宿'],['J_HJ_SJ','新宿〜八王子']],x:{kind:'jr',s:'新宿〜八王子'}},
+  {id:'R6',dir:'ret',name:'代々木八幡 → 京王八王子',via:'小田急線・新宿で京王線',legs:[['O_SJ_YYH','代々木八幡〜新宿'],['K_SJ_KH','新宿〜京王八王子']],x:{kind:'liner',s:'新宿〜京王八王子'}},
+];
+const HOLIDAYS = new Set([
+ '2026-01-01','2026-01-12','2026-02-11','2026-02-23','2026-03-20','2026-04-29','2026-05-03','2026-05-04','2026-05-05','2026-05-06','2026-07-20','2026-08-11','2026-09-21','2026-09-22','2026-09-23','2026-10-12','2026-11-03','2026-11-23',
+ '2027-01-01','2027-01-11','2027-02-11','2027-02-23','2027-03-21','2027-03-22','2027-04-29','2027-05-03','2027-05-04','2027-05-05','2027-07-19','2027-08-11','2027-09-20','2027-09-23','2027-10-11','2027-11-03','2027-11-23',
+ '2028-01-01','2028-01-10','2028-02-11','2028-02-23','2028-03-20','2028-04-29','2028-05-03','2028-05-04','2028-05-05','2028-07-17','2028-08-11','2028-09-18','2028-09-22','2028-10-09','2028-11-03','2028-11-23'
+]);
+const isHoliday = d => { const w = new Date(d+'T00:00:00').getDay(); return w===0||w===6||HOLIDAYS.has(d); };
+const pad = n => String(n).padStart(2,'0');
+const ymd = dt => dt.getFullYear()+'-'+pad(dt.getMonth()+1)+'-'+pad(dt.getDate());
+const today = () => ymd(new Date());
+const yen = n => '¥'+Number(n||0).toLocaleString('ja-JP');
+const WD = ['日','月','火','水','木','金','土'];
+const fmtDay = d => { const dt=new Date(d+'T00:00:00'); return (dt.getMonth()+1)+'/'+dt.getDate()+'（'+WD[dt.getDay()]+'）'; };
+const esc = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $ = id => document.getElementById(id);
+
+// ---------- state ----------
+let fares = Object.fromEntries(FARE_DEFS.map(f=>[f.k,f.v]));
+let faresConfirmed = false;
+let trips = [];
+const sel = {out:null, ret:null, outX:false, retX:false};
+let draft = {out:[], ret:[]};
+const otherRows = {out:[], ret:[]};
+const newOther = () => ({f:'', to:'', s:'', c:'', t:'運賃', a:0, n:''});
+const filledOther = o => (o.f||'').trim() || (o.to||'').trim() || o.a || (o.n||'').trim();
+const COMPANIES = ['東日本旅客鉄道','京王電鉄','小田急電鉄','東京地下鉄','東京都交通局','東京臨海高速鉄道','ゆりかもめ','東京急行電鉄','西武鉄道','東武鉄道','東京モノレール'];
+
+// ---------- storage ----------
+const store = {mode:'local', col:null};
+const LS = 'kotsuhi-note-v1';
+function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS)||'{}'); return j; }catch(e){ return {}; } }
+function lsSave(){ try{ localStorage.setItem(LS, JSON.stringify({trips, fares, faresConfirmed})); }catch(e){} }
+function applySettings(d){ if(!d) return; if(d.fares) fares = Object.assign({}, fares, d.fares); faresConfirmed = !!d.faresConfirmed; }
+
+async function initStore(){
+  const local = lsLoad();
+  trips = Array.isArray(local.trips) ? local.trips : [];
+  applySettings(local);
+  try{ if(navigator.storage && navigator.storage.persist) await navigator.storage.persist(); }catch(e){}
+  setStatus(); renderAll();
+}
+function setStatus(msg){
+  const el = $('storeStatus');
+  if(msg){ el.textContent = msg; el.className='status'; return; }
+  el.textContent='保存先：このiPhoneの中（ほかの端末とは共有されません）。下の「バックアップ」で定期的に書き出してください。'; el.className='status';
+}
+async function addTrip(t){
+  const id = 'trip_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  if(store.mode==='db'){ await store.col.doc(id).set(t); }
+  else { trips.push(Object.assign({id}, t)); lsSave(); renderAll(); }
+}
+async function removeTrip(id){
+  if(store.mode==='db'){ await store.col.doc(id).delete(); }
+  else { trips = trips.filter(t=>t.id!==id); lsSave(); renderAll(); }
+}
+async function saveSettings(){
+  if(store.mode==='db'){ await store.col.doc('settings').set({fares, faresConfirmed}); }
+  else lsSave();
+}
+
+// ---------- logic ----------
+function rowsFor(dir){
+  if(sel[dir]==='OTHER') return otherRows[dir];
+  const r =ROUTES.find(x=>x.id===sel[dir]); if(!r) return [];
+  const rows = r.legs.map(([k,s])=>({s, c:FARE_BY[k].c, t:'運賃', a:fares[k]}));
+  if(sel[dir+'X']){
+    if(r.x.kind==='liner'){ const k = isHoliday($('date').value)?'X_LINER_HD':'X_LINER_WD'; rows.push({s:r.x.s+'（京王ライナー）', c:'京王電鉄', t:'特急料金', a:fares[k]}); }
+    else if(sel[dir+'X']==='green') rows.push({s:r.x.s+'（グリーン車）', c:'東日本旅客鉄道', t:'グリーン料金', a:fares.X_JR_GREEN});
+    else rows.push({s:r.x.s+'（中央線特急）', c:'東日本旅客鉄道', t:'特急料金', a:fares.X_JR_EXP});
+  }
+  return rows;
+}
+function rebuildDraft(){ draft.out = rowsFor('out'); draft.ret = rowsFor('ret'); }
+const routeFare = r => r.legs.reduce((s,[k])=>s+Number(fares[k]||0),0);
+const tripTotal = t => t.rows.reduce((s,r)=>s+Number(r.a||0),0);
+
+// ---------- render: entry ----------
+function renderDir(dir){
+  const el = $(dir==='out'?'c-out':'c-ret');
+  const list = ROUTES.filter(r=>r.dir===dir);
+  const r = ROUTES.find(x=>x.id===sel[dir]);
+  let h = '<h2><span class="dirtag '+(dir==='ret'?'ret':'')+'">'+(dir==='out'?'往路':'復路')+'</span>'+(dir==='out'?'編集室へ':'帰り')+'</h2><div class="routes">';
+  list.forEach(x=>{ h += '<button class="route" data-dir="'+dir+'" data-id="'+x.id+'" aria-pressed="'+(sel[dir]===x.id)+'"><span class="nm">'+esc(x.name)+'</span><span class="yen">'+yen(routeFare(x))+'</span><span class="via">'+esc(x.via)+'</span></button>'; });
+  h += '<button class="route" data-dir="'+dir+'" data-id="OTHER" aria-pressed="'+(sel[dir]==='OTHER')+'"><span class="nm">その他（手入力）</span><span class="yen"></span><span class="via">お台場・出張など、上にないルート</span></button>';
+  h += '<button class="route none" data-dir="'+dir+'" data-id="" aria-pressed="'+(sel[dir]===null)+'">'+(dir==='out'?'往路は記録しない':'復路は記録しない')+'</button></div>';
+  if(sel[dir]==='OTHER'){
+    h += '<div class="other">';
+    otherRows[dir].forEach((o,i)=>{
+      const at = (f)=>'id="o-'+dir+'-'+i+'-'+f+'" data-od="'+dir+'" data-oi="'+i+'" data-of="'+f+'"';
+      h += '<div class="orow">'
+        + '<label class="f">出発駅<input type="text" '+at('f')+' value="'+esc(o.f)+'" placeholder="例：新宿"></label>'
+        + '<label class="f">到着駅<input type="text" '+at('to')+' value="'+esc(o.to)+'" placeholder="例：宇都宮"></label>'
+        + '<label class="f">種別<select '+at('t')+'>'+['運賃','特急料金','グリーン料金'].map(t=>'<option'+(o.t===t?' selected':'')+'>'+t+'</option>').join('')+'</select></label>'
+        + '<label class="f">金額<input type="number" inputmode="numeric" '+at('a')+' value="'+(o.a||'')+'" placeholder="0"></label>'
+        + '<label class="f full">備考<input type="text" '+at('n')+' value="'+esc(o.n)+'" placeholder="例：宇都宮出張・新幹線"></label>'
+        + (otherRows[dir].length>1 ? '<button class="orm" data-orm="'+dir+'" data-oi="'+i+'" aria-label="この行を消す">行を消す</button>' : '')
+        + '</div>';
+    });
+    h += '<button class="btn sub" data-oadd="'+dir+'">＋ 行を追加（乗り換え・特急料金など）</button></div>';
+  }
+  if(r){
+    if(r.x.kind==='liner'){
+      const hd = isHoliday($('date').value);
+      const amt = fares[hd?'X_LINER_HD':'X_LINER_WD'];
+      const lab = '京王ライナーを使った（'+r.x.s+'・'+(hd?'土休日':'平日')+'）';
+      h += '<label class="exp"><input type="checkbox" id="x-'+dir+'" '+(sel[dir+'X']?'checked':'')+'><span>'+esc(lab)+'</span><span class="yen">+'+yen(amt)+'</span></label>';
+    } else {
+      const opts = [['', r.x.s+' は普通車', 0], ['exp', '中央線特急を使った', fares.X_JR_EXP], ['green', 'グリーン車を使った', fares.X_JR_GREEN]];
+      h += '<div class="routes" role="radiogroup" aria-label="'+esc(r.x.s)+'の料金">' + opts.map(([v,l,a])=>'<label class="exp"><input type="radio" name="x-'+dir+'" id="x-'+dir+'-'+(v||'none')+'" value="'+v+'" '+((sel[dir+'X']||'')===v?'checked':'')+'><span>'+esc(l)+'</span><span class="yen">'+(a?'+'+yen(a):'')+'</span></label>').join('') + '</div>';
+    }
+  }
+  el.innerHTML = h;
+}
+function renderPreview(){
+  const el = $('preview');
+  const all = [];
+  let h = '';
+  ['out','ret'].forEach(dir=>{
+    draft[dir].forEach((row,i)=>{
+      all.push(row);
+      if(sel[dir]==='OTHER'){ h += '<div class="trow"><span class="s">'+(dir==='out'?'往 ':'復 ')+esc((row.f||'').trim()||'（出発駅）')+'〜'+esc((row.to||'').trim()||'（到着駅）')+'</span><span class="c">'+esc(row.n||'')+(row.t!=='運賃'?'<span class="k">'+esc(row.t)+'</span>':'')+'</span><span class="amt">'+yen(row.a)+'</span></div>'; return; }
+      h +='<div class="trow"><span class="s">'+(dir==='out'?'往 ':'復 ')+esc(row.s)+'</span><span class="c">'+esc(row.c)+(row.t!=='運賃'?'<span class="k">'+esc(row.t)+'</span>':'')+'</span><input type="number" inputmode="numeric" id="amt-'+dir+'-'+i+'" data-dir="'+dir+'" data-i="'+i+'" value="'+row.a+'" aria-label="'+esc(row.s)+'の金額"></div>';
+    });
+  });
+  if(!all.length){ h = '<p class="muted" style="margin:0">往路か復路のルートを選ぶと、ここに記録内容が出ます。</p>'; }
+  else {
+    const fare = all.filter(r=>r.t==='運賃').reduce((s,r)=>s+Number(r.a||0),0);
+    const exp = all.filter(r=>r.t!=='運賃').reduce((s,r)=>s+Number(r.a||0),0);
+    h += '<div class="total"><span>合計'+(exp?'<span class="muted">（運賃 '+yen(fare)+' ＋ 特急・グリーン '+yen(exp)+'）</span>':'')+'</span><b>'+yen(fare+exp)+'</b></div>';
+  }
+  el.innerHTML = h;
+  $('save').disabled = !all.length;
+}
+function renderEntryMeta(){
+  const d = $('date').value;
+  const hd = isHoliday(d);
+  const dt = $('daytype'); dt.textContent = hd ? '土休日' : '平日'; dt.className = 'daytype'+(hd?' hd':'');
+  const dup = [];
+  ['out','ret'].forEach(dir=>{ if(sel[dir] && trips.some(t=>t.date===d && t.dir===dir)) dup.push(dir==='out'?'往路':'復路'); });
+  $('dupWarn').innerHTML = dup.length ? '<div class="warn">'+fmtDay(d)+'の'+dup.join('・')+'はすでに記録があります。二重登録に注意してください。</div>' : '';
+}
+function renderEntry(){ renderDir('out'); renderDir('ret'); renderPreview(); renderEntryMeta(); }
+
+// ---------- render: history ----------
+function renderHistory(){
+  const m = $('histMonth').value;
+  const list = trips.filter(t=>t.date && t.date.startsWith(m)).sort((a,b)=> b.date.localeCompare(a.date) || (a.dir===b.dir?0:(a.dir==='out'?-1:1)));
+  const el = $('histList');
+  if(!list.length){ el.innerHTML = '<p class="muted" style="margin:0">この月の記録はまだありません。「記録」タブから追加できます。</p>'; return; }
+  const byDay = {};
+  list.forEach(t=>{ (byDay[t.date] = byDay[t.date]||[]).push(t); });
+  let h = '';
+  Object.keys(byDay).forEach(d=>{
+    const ts = byDay[d];
+    h += '<div class="day"><div class="dayhead">'+fmtDay(d)+'<span>'+yen(ts.reduce((s,t)=>s+tripTotal(t),0))+'</span></div>';
+    ts.forEach(t=>{
+      h += '<div class="trip"><div class="triphead"><span class="dirtag '+(t.dir==='ret'?'ret':'')+'">'+(t.dir==='out'?'往路':'復路')+'</span>'+esc(t.label||'')+'<button class="del" data-del="'+esc(t.id)+'">削除</button></div>';
+      t.rows.forEach(r=>{ h += '<div class="trow"><span class="s">'+esc(r.s)+'</span><span class="c">'+esc([r.c,r.n].filter(Boolean).join('・'))+(r.t!=='運賃'?'<span class="k">'+esc(r.t)+'</span>':'')+'</span><span class="amt">'+yen(r.a)+'</span></div>'; });
+      h += '</div>';
+    });
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
+
+// ---------- render: csv ----------
+function csvRows(){
+  const f = $('from').value, t = $('to').value;
+  return trips.filter(x=>x.date>=f && x.date<=t)
+    .sort((a,b)=> a.date.localeCompare(b.date) || (a.dir===b.dir?0:(a.dir==='out'?-1:1)) || (a.createdAt||0)-(b.createdAt||0))
+    .flatMap(x=>x.rows.map(r=>({d:x.date, ...r, c: r.c==='JR東日本' ? '東日本旅客鉄道' : r.c})));
+}
+const q = v => { v = String(v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
+function buildCsv(){
+  const lines = [['日付','区間','鉄道会社','金額','種別','備考'].join(',')];
+  csvRows().forEach(r=> lines.push([r.d.replace(/-/g,'/'), r.s, r.c, r.a, r.t, r.n||''].map(q).join(',')));
+  return lines.join('\r\n');
+}
+function renderCsv(){
+  const rows = csvRows();
+  const fare = rows.filter(r=>r.t==='運賃').reduce((s,r)=>s+Number(r.a||0),0);
+  const exp = rows.filter(r=>r.t!=='運賃').reduce((s,r)=>s+Number(r.a||0),0);
+  $('csvStats').innerHTML = '<div class="stat"><small>運賃</small><b>'+yen(fare)+'</b></div><div class="stat"><small>特急・グリーン</small><b>'+yen(exp)+'</b></div><div class="stat"><small>合計</small><b>'+yen(fare+exp)+'</b></div>';
+  $('csvPre').textContent = rows.length ? buildCsv() : 'この期間の記録はありません。';
+  $('dl').disabled = $('copy').disabled = !rows.length;
+}
+
+// ---------- render: fares ----------
+function renderFares(){
+  $('fareList').innerHTML = FARE_DEFS.map(f=>'<div class="fare"><span>'+esc(f.s)+'</span><span class="c">'+esc(f.c)+'・'+f.t+'</span><input type="number" inputmode="numeric" id="fare-'+f.k+'" data-fare="'+f.k+'" value="'+fares[f.k]+'" aria-label="'+esc(f.s)+'"></div>').join('');
+}
+function renderBanner(){
+  $('banner').innerHTML = faresConfirmed ? '' : '<div class="warn">初期の運賃は目安です。最初に「運賃表」タブで金額を確認し、保存してください。</div>';
+}
+function renderSum(){
+  const m = today().slice(0,7);
+  $('sumMonth').textContent = yen(trips.filter(t=>t.date&&t.date.startsWith(m)).reduce((s,t)=>s+tripTotal(t),0));
+}
+function renderAll(){ renderBackup(); rebuildDraft(); renderEntry(); renderHistory(); renderCsv(); renderFares(); renderBanner(); renderSum(); }
+
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2200); }
+function setRange(which){
+  const n = new Date(); const y=n.getFullYear(), m=n.getMonth() - (which==='last'?1:0);
+  $('from').value = ymd(new Date(y,m,1)); $('to').value = ymd(new Date(y,m+1,0)); renderCsv();
+}
+
+// ---------- events ----------
+document.querySelector('.tabs').addEventListener('click', e=>{
+  const b = e.target.closest('button[data-tab]'); if(!b) return;
+  document.querySelectorAll('.tabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
+  ['entry','history','csv','fares'].forEach(k=> $('p-'+k).hidden = k!==b.dataset.tab);
+});
+$('p-entry').addEventListener('click', e=>{
+  const add = e.target.closest('[data-oadd]');
+  if(add){ const dir=add.dataset.oadd; otherRows[dir].push(newOther()); rebuildDraft(); renderEntry(); return; }
+  const rm = e.target.closest('[data-orm]');
+  if(rm){ const dir=rm.dataset.orm; otherRows[dir].splice(+rm.dataset.oi,1); rebuildDraft(); renderEntry(); return; }
+  const b = e.target.closest('.route'); if(!b) return;
+  const dir = b.dataset.dir; sel[dir] = b.dataset.id || null; sel[dir+'X'] = false;
+  if(sel[dir]==='OTHER' && !otherRows[dir].length) otherRows[dir].push(newOther());
+  rebuildDraft(); renderEntry();
+});
+$('p-entry').addEventListener('change', e=>{
+  if(e.target.id==='x-out'||e.target.id==='x-ret'){ const dir=e.target.id.slice(2); sel[dir+'X']=e.target.checked; rebuildDraft(); renderPreview(); }
+  if(e.target.type==='radio' && /^x-(out|ret)$/.test(e.target.name)){ const dir=e.target.name.slice(2); sel[dir+'X']=e.target.value||false; rebuildDraft(); renderPreview(); }
+});
+$('p-entry').addEventListener('input', e=>{
+  const el = e.target;
+  if(el.dataset.od){
+    const o = otherRows[el.dataset.od][+el.dataset.oi]; const f = el.dataset.of;
+    o[f] = f==='a' ? Math.max(0, parseInt(el.value,10)||0) : el.value;
+    o.s = (o.f||'').trim() + '〜' + (o.to||'').trim();
+    renderPreview(); return;
+  }
+  if(el.dataset.i===undefined) return;
+  draft[el.dataset.dir][+el.dataset.i].a = Math.max(0, parseInt(el.value,10)||0);
+});
+$('date').addEventListener('change', ()=>{ if(!$('date').value) $('date').value=today(); rebuildDraft(); renderEntry(); });
+$('save').addEventListener('click', async ()=>{
+  const d = $('date').value; const btn = $('save');
+  for(const dir of ['out','ret']){
+    if(sel[dir]!=='OTHER') continue;
+    const filled = otherRows[dir].filter(filledOther);
+    if(!filled.length || filled.some(o=>!o.f.trim()||!o.to.trim()||!o.a)){ toast((dir==='out'?'往路':'復路')+'の「その他」は出発駅・到着駅・金額を入力してください'); return; }
+  }
+  btn.disabled = true;
+  try{
+    for(const dir of ['out','ret']){
+      if(!draft[dir].length) continue;
+      let routeId, label, rows = draft[dir];
+      if(sel[dir]==='OTHER'){
+        rows = rows.filter(filledOther).map(o=>({s:o.f.trim()+'〜'+o.to.trim(), c:'', t:o.t, a:o.a, n:(o.n||'').trim()}));
+        routeId = 'OTHER'; label = 'その他：'+rows[0].s;
+      } else {
+        const r = ROUTES.find(x=>x.id===sel[dir]);
+        const xl = {exp:'（特急）', green:'（グリーン車）'}[sel[dir+'X']] || (sel[dir+'X']?'（京王ライナー）':'');
+        routeId = r.id; label = r.name+xl;
+      }
+      await addTrip({kind:'trip', date:d, dir, routeId, label, rows:rows.map(x=>({s:String(x.s).trim(),c:String(x.c||'').trim(),t:x.t,a:Number(x.a)||0,n:x.n||''})), createdAt:Date.now()});
+    }
+    sel.out = sel.ret = null; sel.outX = sel.retX = false;
+    otherRows.out = []; otherRows.ret = [];
+    rebuildDraft(); renderEntry();
+    toast(fmtDay(d)+'を記録しました');
+  }catch(err){ toast('保存できませんでした。通信状態を確認してもう一度押してください。'); btn.disabled=false; }
+});
+$('histList').addEventListener('click', async e=>{
+  const b = e.target.closest('.del'); if(!b) return;
+  if(!b.classList.contains('arm')){ b.classList.add('arm'); b.textContent='もう一度押すと削除'; setTimeout(()=>{ if(b.isConnected){ b.classList.remove('arm'); b.textContent='削除'; } }, 4000); return; }
+  try{ await removeTrip(b.dataset.del); toast('削除しました'); }catch(err){ toast('削除できませんでした'); }
+});
+$('histMonth').addEventListener('change', renderHistory);
+$('from').addEventListener('change', renderCsv); $('to').addEventListener('change', renderCsv);
+document.querySelectorAll('[data-range]').forEach(b=>b.addEventListener('click', ()=>setRange(b.dataset.range)));
+$('copy').addEventListener('click', ()=>{
+  const txt = buildCsv();
+  navigator.clipboard.writeText(txt).then(()=>toast('コピーしました'), ()=>{ const r=document.createRange(); r.selectNodeContents($('csvPre')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('選択しました。長押しでコピーしてください'); });
+});
+function saveFile(name, text, type){
+  const blob = new Blob([text], {type});
+  const file = (typeof File==='function') ? new File([blob], name, {type}) : null;
+  if(file && navigator.canShare && navigator.canShare({files:[file]})){
+    return navigator.share({files:[file]}).catch(err=>{ if(err && err.name!=='AbortError') fallback(); });
+  }
+  fallback();
+  function fallback(){
+    const url = URL.createObjectURL(blob); const a = document.createElement('a');
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
+}
+$('dl').addEventListener('click', ()=>{
+  const name = '交通費_'+$('from').value.replace(/-/g,'')+'-'+$('to').value.replace(/-/g,'')+'.csv';
+  saveFile(name, '\uFEFF'+buildCsv(), 'text/csv');
+});
+$('backupOut').addEventListener('click', ()=>{
+  saveFile('交通費ノート_バックアップ_'+today().replace(/-/g,'')+'.json', JSON.stringify({app:'kotsuhi-note', v:1, trips, fares, faresConfirmed}, null, 1), 'application/json');
+  try{ localStorage.setItem(LS+'-lastbackup', today()); }catch(e){}
+  renderBackup();
+});
+$('backupIn').addEventListener('change', async e=>{
+  const f = e.target.files[0]; e.target.value=''; if(!f) return;
+  try{
+    const j = JSON.parse(await f.text());
+    if(j.app!=='kotsuhi-note' || !Array.isArray(j.trips)) throw new Error('format');
+    const have = new Set(trips.map(t=>t.id)); let added = 0;
+    j.trips.forEach(t=>{ if(t && t.id && !have.has(t.id)){ trips.push(t); added++; } });
+    if(j.fares) fares = Object.assign({}, fares, j.fares);
+    if(j.faresConfirmed) faresConfirmed = true;
+    lsSave(); renderAll(); toast(added+'件の記録を読み込みました');
+  }catch(err){ toast('このファイルは読み込めません。交通費ノートのバックアップを選んでください'); }
+});
+function renderBackup(){
+  let last=''; try{ last = localStorage.getItem(LS+'-lastbackup')||''; }catch(e){}
+  $('backupInfo').textContent = last ? '前回のバックアップ：'+last.replace(/-/g,'/') : 'まだバックアップしていません。';
+}
+$('saveFares').addEventListener('click', async ()=>{
+  document.querySelectorAll('[data-fare]').forEach(i=>{ fares[i.dataset.fare] = Math.max(0, parseInt(i.value,10)||0); });
+  faresConfirmed = true;
+  try{ await saveSettings(); toast('運賃表を保存しました'); }catch(err){ toast('保存できませんでした'); }
+  renderAll();
+});
+
+// ---------- boot ----------
+$('date').value = today();
+$('histMonth').value = today().slice(0,7);
+setRange('this');
+initStore();
+})();
+</script>
+</body>
+</html>
